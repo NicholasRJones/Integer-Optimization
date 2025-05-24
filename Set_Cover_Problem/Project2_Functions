@@ -1,0 +1,300 @@
+import numpy as np
+
+def greedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq):
+    uncovered_rows = np.ones(num_rows, dtype=bool)
+    selected_cols = []
+    iteration = 0
+    def update_col_dict(index):
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, selected_cols
+        selected_cols.append(index)
+        new_rows_indices = col_coverage_dict[index]["indices"]
+        for i in new_rows_indices:
+            uncovered_rows[i] = False
+            for j in row_coverage_dict[i]["indices"]:
+                col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != i]
+                col_coverage_dict[j]["count"] -= 1
+            row_coverage_dict[i]["indices"] = []
+            row_coverage_dict[i]["count"] = 0
+        return
+    def clean_selection():
+        nonlocal col_coverage_dict, selected_cols, col_coverage_copy
+        coverage_set = set(int(i) for col in selected_cols for i in col_coverage_copy[col])
+        col_set = set(selected_cols)
+        for j in selected_cols:
+            col_set.discard(j)
+            new_selection = list(col_set)
+            col_set.add(j)
+            new_coverage = set(int(i) for col in new_selection for i in col_coverage_copy[col])
+            if new_coverage == coverage_set:
+                selected_cols = new_selection
+                break
+        return
+    while uncovered_rows.any():
+        iteration += 1
+        max_col_idx = max(col_coverage_dict, key=lambda k: col_coverage_dict[k]["count"])
+        update_col_dict(max_col_idx)
+        if iteration % clean_freq == 0:
+            clean_selection()
+    clean_selection()
+    return selected_cols
+
+
+def pregreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq, file):
+    uncovered_rows = np.ones(num_rows, dtype=bool)
+    current_cols = np.ones(num_cols, dtype=bool)
+    selected_cols = []
+    iteration = 0
+    # Select column and update dictionaries
+    def update_col_dict(index):
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, current_cols, selected_cols
+        selected_cols.append(index)
+        current_cols[index] = False
+        new_rows_indices = col_coverage_dict[index]["indices"]
+        for i in new_rows_indices:
+            uncovered_rows[i] = False
+            for j in row_coverage_dict[i]["indices"]:
+                col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != i]
+                col_coverage_dict[j]["count"] -= 1
+            row_coverage_dict[i]["indices"] = []
+            row_coverage_dict[i]["count"] = 0
+        return
+    # Clean redundancies in selection
+    def clean_selection():
+        nonlocal col_coverage_dict, selected_cols, col_coverage_copy
+        coverage_set = set(int(i) for col in selected_cols for i in col_coverage_copy[col])
+        col_set = set(selected_cols)
+        for j in selected_cols:
+            col_set.discard(j)
+            new_selection = list(col_set)
+            col_set.add(j)
+            new_coverage = set(int(i) for col in new_selection for i in col_coverage_copy[col])
+            if new_coverage == coverage_set:
+                selected_cols = new_selection
+                break
+        return
+    # Remove superset rows, subset columns, and select columns of singular rows
+    def preprocess():
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, current_cols, num_rows, num_cols
+        singular_row_columns = []
+        for index in range(max(num_cols, num_rows)):
+            # If the index is valid
+            if index < num_rows:
+                # If the row is uncovered
+                if uncovered_rows[index]:
+                    # Check if it has a subset row
+                    if subset_check(index, 'row'):
+                        uncovered_rows[index] = False
+                        # Update column coverages
+                        for j in row_coverage_dict[index]["indices"]:
+                            col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != index]
+                            col_coverage_dict[j]["count"] -= 1
+                            if col_coverage_dict[j]["count"] == 0:
+                                current_cols[j] = False
+                        row_coverage_dict[index]["indices"] = []
+                        row_coverage_dict[index]["count"] = 0
+            # If the index is valid
+            if index < num_cols:
+                # if the column is valid
+                if current_cols[index]:
+                    # Check this column is a subset of another column
+                    if subset_check(index, 'col'):
+                        current_cols[index] = False
+                        # Update row coverages
+                        for j in col_coverage_dict[index]["indices"]:
+                            row_coverage_dict[j]["indices"] = row_coverage_dict[j]["indices"][row_coverage_dict[j]["indices"] != index]
+                            row_coverage_dict[j]["count"] -= 1
+                            # Isolate singleton rows
+                            if row_coverage_dict[j]["count"] == 1:
+                                singular_row_columns.append(row_coverage_dict[j]["indices"][0])
+                        col_coverage_dict[index]["indices"] = []
+                        col_coverage_dict[index]["count"] = 0
+        # Select all locations that cover singleton rows
+        for index in set(singular_row_columns):
+            update_col_dict(index)
+        return
+    def subset_check(index, axis):
+        nonlocal col_coverage_dict, row_coverage_dict
+        if axis == 'row':
+            # Check every column that covers the indexed row
+            for i in row_coverage_dict[index]["indices"]:
+                # Check every other row that is covered by column i
+                for j in col_coverage_dict[i]["indices"]:
+                    # If this valid row is a subset of our indexed row, return True
+                    if j != index and set(row_coverage_dict[j]["indices"]).issubset(set(row_coverage_dict[index]["indices"])):
+                        return True
+        elif axis == 'col':
+            # Check every row that is covered by the indexed column
+            for i in col_coverage_dict[index]["indices"]:
+                # Check every other column that covers row i
+                for j in row_coverage_dict[i]["indices"]:
+                    # If the indexed column is a subset of the valid column, return True
+                    if j != index and set(col_coverage_dict[index]["indices"]).issubset(set(col_coverage_dict[j]["indices"])):
+                        return True
+        return False
+    # Main loop
+    while uncovered_rows.any():
+        iteration += 1
+        if iteration > 100 or file == 'phase1':
+            preprocess()
+        max_col_idx = max(col_coverage_dict, key=lambda k: col_coverage_dict[k]["count"])
+        update_col_dict(max_col_idx)
+        if iteration % clean_freq == 0:
+            clean_selection()
+    clean_selection()
+    return selected_cols
+
+
+def modgreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq):
+    hard_to_cover_min = min((k for k in row_coverage_dict if row_coverage_dict[k]["count"] > 0),
+                            key=lambda k: row_coverage_dict[k]["count"]) - 1
+    uncovered_rows = np.ones(num_rows, dtype=bool)
+    current_cols = np.ones(num_cols, dtype=bool)
+    selected_cols = []
+    iteration = 0
+    def update_col_dict(index):
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, selected_cols
+        selected_cols.append(index)
+        current_cols[index] = False
+        new_rows_indices = col_coverage_dict[index]["indices"]
+        for i in new_rows_indices:
+            uncovered_rows[i] = False
+            for j in row_coverage_dict[i]["indices"]:
+                col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != i]
+                col_coverage_dict[j]["count"] -= 1
+            row_coverage_dict[i]["indices"] = []
+            row_coverage_dict[i]["count"] = 0
+        return
+    def clean_selection():
+        nonlocal col_coverage_dict, selected_cols, col_coverage_copy
+        coverage_set = set(int(i) for col in selected_cols for i in col_coverage_copy[col])
+        col_set = set(selected_cols)
+        for j in selected_cols:
+            col_set.discard(j)
+            new_selection = list(col_set)
+            col_set.add(j)
+            new_coverage = set(int(i) for col in new_selection for i in col_coverage_copy[col])
+            if new_coverage == coverage_set:
+                selected_cols = new_selection
+                break
+        return
+    # Score creation for modified greedy
+    while uncovered_rows.any():
+        iteration += 1
+        log = np.log(1.1)
+        max_col_idx = max(col_coverage_dict, key=lambda k: col_coverage_dict[k]["count"] * np.exp(log * sum([(1 / (max(1, row_coverage_dict[i]["count"] - hard_to_cover_min))) for i in col_coverage_dict[k]["indices"]])))
+        update_col_dict(max_col_idx)
+        if iteration % clean_freq == 0:
+            clean_selection()
+    clean_selection()
+    return selected_cols
+
+
+def premodgreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq, file):
+    hard_to_cover_min = min((k for k in row_coverage_dict if row_coverage_dict[k]["count"] > 0),
+                            key=lambda k: row_coverage_dict[k]["count"]) - 1
+    uncovered_rows = np.ones(num_rows, dtype=bool)
+    current_cols = np.ones(num_cols, dtype=bool)
+    selected_cols = []
+    iteration = 0
+    # Select column and update dictionaries
+    def update_col_dict(index):
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, current_cols, selected_cols
+        selected_cols.append(index)
+        current_cols[index] = False
+        new_rows_indices = col_coverage_dict[index]["indices"]
+        for i in new_rows_indices:
+            uncovered_rows[i] = False
+            for j in row_coverage_dict[i]["indices"]:
+                col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != i]
+                col_coverage_dict[j]["count"] -= 1
+            row_coverage_dict[i]["indices"] = []
+            row_coverage_dict[i]["count"] = 0
+        return
+    # Clean redundancies in selection
+    def clean_selection():
+        nonlocal col_coverage_dict, selected_cols, col_coverage_copy
+        coverage_set = set(int(i) for col in selected_cols for i in col_coverage_copy[col])
+        col_set = set(selected_cols)
+        for j in selected_cols:
+            col_set.discard(j)
+            new_selection = list(col_set)
+            col_set.add(j)
+            new_coverage = set(int(i) for col in new_selection for i in col_coverage_copy[col])
+            if new_coverage == coverage_set:
+                selected_cols = new_selection
+                break
+        return
+    # Remove superset rows, subset columns, and select columns of singular rows
+    def preprocess():
+        nonlocal col_coverage_dict, row_coverage_dict, uncovered_rows, current_cols, num_rows, num_cols, hard_to_cover_min
+        singular_row_columns = []
+        for index in range(max(num_cols, num_rows)):
+            # If the index is valid
+            if index < num_rows:
+                # If the row is uncovered
+                if uncovered_rows[index]:
+                    # Check if it has a subset row
+                    if subset_check(index, 'row'):
+                        uncovered_rows[index] = False
+                        # Update column coverages
+                        for j in row_coverage_dict[index]["indices"]:
+                            col_coverage_dict[j]["indices"] = col_coverage_dict[j]["indices"][col_coverage_dict[j]["indices"] != index]
+                            col_coverage_dict[j]["count"] -= 1
+                            if col_coverage_dict[j]["count"] == 0:
+                                current_cols[j] = False
+                        row_coverage_dict[index]["indices"] = []
+                        row_coverage_dict[index]["count"] = 0
+            # If the index is valid
+            if index < num_cols:
+                # if the column is valid
+                if current_cols[index]:
+                    # Check this column is a subset of another column
+                    if subset_check(index, 'col'):
+                        current_cols[index] = False
+                        # Update row coverages
+                        for j in col_coverage_dict[index]["indices"]:
+                            row_coverage_dict[j]["indices"] = row_coverage_dict[j]["indices"][row_coverage_dict[j]["indices"] != index]
+                            row_coverage_dict[j]["count"] -= 1
+                            hard_to_cover_min = max(min(hard_to_cover_min, row_coverage_dict[j]["count"] - 1), 1)
+                            # Isolate singleton rows
+                            if row_coverage_dict[j]["count"] == 1:
+                                singular_row_columns.append(row_coverage_dict[j]["indices"][0])
+                        col_coverage_dict[index]["indices"] = []
+                        col_coverage_dict[index]["count"] = 0
+        # Select all locations that cover singleton rows
+        for index in set(singular_row_columns):
+            update_col_dict(index)
+        return
+    def subset_check(index, axis):
+        nonlocal col_coverage_dict, row_coverage_dict
+        if axis == 'row':
+            # Check every column that covers the indexed row
+            for i in row_coverage_dict[index]["indices"]:
+                # Check every other row that is covered by column i
+                for j in col_coverage_dict[i]["indices"]:
+                    # If this valid row is a subset of our indexed row, return True
+                    if j != index and set(row_coverage_dict[j]["indices"]).issubset(set(row_coverage_dict[index]["indices"])):
+                        return True
+        elif axis == 'col':
+            # Check every row that is covered by the indexed column
+            for i in col_coverage_dict[index]["indices"]:
+                # Check every other column that covers row i
+                for j in row_coverage_dict[i]["indices"]:
+                    # If the indexed column is a subset of the valid column, return True
+                    if j != index and set(col_coverage_dict[index]["indices"]).issubset(set(col_coverage_dict[j]["indices"])):
+                        return True
+        return False
+    # Main loop
+    while uncovered_rows.any():
+        iteration += 1
+        if iteration > 100 or file == 'phase1':
+            preprocess()
+        log = np.log(1.1)
+        max_col_idx = max(col_coverage_dict, key=lambda k: col_coverage_dict[k]["count"] * np.exp(log *
+            sum([(1 / (max(1, row_coverage_dict[i]["count"] - hard_to_cover_min))) for i in
+                 col_coverage_dict[k]["indices"]])))
+        update_col_dict(max_col_idx)
+        if iteration % clean_freq == 0:
+            clean_selection()
+    clean_selection()
+    return selected_cols

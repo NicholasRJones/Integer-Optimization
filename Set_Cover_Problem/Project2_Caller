@@ -1,0 +1,82 @@
+import time
+import Project2_Functions as pf
+import pickle
+
+# Select data: 'phase1' or 'cap360'
+file = 'cap360'
+# Preprocessing: 'yes' or 'no'
+preprocessing = 'yes'
+# How often to clean solution during running. Default clean at end. Expensive for cap360.
+clean_freq = 1000
+
+
+if file == 'phase1':
+    # Load all dictionaries from the pickle file
+    with open('coverage_dicts.pkl', 'rb') as f:
+        loaded_dicts = pickle.load(f)
+        row_coverage_dict = loaded_dicts['row_coverage_dict_phase1']
+        col_coverage_dict = loaded_dicts['col_coverage_dict_phase1']
+        num_rows, num_cols = len(row_coverage_dict), len(col_coverage_dict)
+    print("Dictionaries have been loaded.")
+elif file == 'cap360':
+    # Load all dictionaries from the pickle file
+    with open('coverage_dicts.pkl', 'rb') as f:
+        loaded_dicts = pickle.load(f)
+        row_coverage_dict = loaded_dicts['row_coverage_dict_cap360']
+        col_coverage_dict= loaded_dicts['col_coverage_dict_cap360']
+        num_rows, num_cols = len(row_coverage_dict), len(col_coverage_dict)
+    print("Dictionaries have been loaded.")
+else:
+    exit(f"Error: Select Data")
+
+col_coverage_copy = [col_coverage_dict[col]["indices"] for col in range(num_cols)]
+
+
+print(f"Greedy: {file}, Preprocessing: {preprocessing}")
+if preprocessing == 'no':
+    start_time = time.perf_counter()
+    locations = pf.greedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq)
+elif preprocessing == 'yes':
+    start_time = time.perf_counter()
+    locations = pf.pregreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq, file)
+else:
+    exit(f"Error: Select Prepocessing")
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+print(f"Locations: {len(locations)}")
+print(f"Elapsed time: {elapsed_time:.6f} seconds")
+
+
+if file == 'phase1':
+    # Load all dictionaries from the pickle file
+    with open('coverage_dicts.pkl', 'rb') as f:
+        loaded_dicts = pickle.load(f)
+        row_coverage_dict = loaded_dicts['row_coverage_dict_phase1']
+        col_coverage_dict = loaded_dicts['col_coverage_dict_phase1']
+        num_rows, num_cols = len(row_coverage_dict), len(col_coverage_dict)
+    print("Dictionaries have been loaded.")
+elif file == 'cap360':
+    # Load all dictionaries from the pickle file
+    with open('coverage_dicts.pkl', 'rb') as f:
+        loaded_dicts = pickle.load(f)
+        row_coverage_dict = loaded_dicts['row_coverage_dict_cap360']
+        col_coverage_dict= loaded_dicts['col_coverage_dict_cap360']
+        num_rows, num_cols = len(row_coverage_dict), len(col_coverage_dict)
+    print("Dictionaries have been loaded.")
+else:
+    exit(f"Error: Select Data")
+
+
+print(f"Modified Greedy: {file}, Preprocessing: {preprocessing}")
+if preprocessing == 'no':
+    start_time = time.perf_counter()
+    locations = pf.modgreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, 50)
+elif preprocessing == 'yes':
+    start_time = time.perf_counter()
+    locations = pf.premodgreedy(col_coverage_dict, row_coverage_dict, num_rows, num_cols, col_coverage_copy, clean_freq, file)
+else:
+    exit(f"Error: Select Prepocessing")
+end_time = time.perf_counter()
+elapsed_time = end_time - start_time
+print(f"Locations: {len(locations)}")
+print(f"Elapsed time: {elapsed_time:.6f} seconds")
