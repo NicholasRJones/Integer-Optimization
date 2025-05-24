@@ -1,0 +1,123 @@
+# Parameters
+param n; #Subgrid size
+param N := n^2; #Grid size
+param puzzle {1..N, 1..N} integer; #Puzzle Data
+param puzzle_id; #ID
+
+# Variables
+var x {i in 1..N, j in 1..N} integer, >= 1, <=N; #Grid Value
+var y {i in 1..N, j in 1..N, k in 1..N} binary; #Indicator variable
+
+#Constraints
+subject to Square {i in 1..N, j in 1..N}:
+	sum {k in 1..N} y[i,j,k] = 1;
+
+subject to Row {i in 1..N, k in 1..N}:
+	sum {j in 1..N} y[i,j,k] = 1;
+
+subject to Column {j in 1..N, k in 1..N}:
+	sum {i in 1..N} y[i,j,k] = 1;
+
+subject to Box {b in 1..n, k in 1..N}:
+	sum{i in (b-1)*n+1..b*n, j in (b-1)*n+1..b*n} y[i,j,k] = 1;
+
+subject to Value1 {i in 1..N, j in 1..N, k in 1..N}:
+	k <= x[i,j] + 2*N*(1-y[i,j,k]);
+
+subject to Value2 {i in 1..N, j in 1..N, k in 1..N}:
+	k >= x[i,j] - 2*N*(1-y[i,j,k]);
+
+subject to Grid {i in 1..N, j in 1..N}:
+    if puzzle[i,j] > 0 then
+    	x[i,j] = puzzle[i,j];
+
+option solver gurobi;
+option gurobi_options 'tech:timing=1';
+
+printf ("EASY");
+
+data;
+
+# Easy Puzzle (Puzzle ID = 9766753348)
+param puzzle_id := 9766753348;
+param n := 3;  # Subgrid size (3x3 subgrid for 9x9 grid)
+param puzzle:
+  1 2 3 4 5 6 7 8 9 :=
+1 9 0 3 0 8 0 0 4 6
+2 0 5 0 0 0 9 0 0 0
+3 0 4 0 1 6 2 0 9 0
+4 5 7 0 0 0 8 0 0 0
+5 8 0 0 3 9 7 0 0 2
+6 0 0 0 5 0 0 0 6 7
+7 0 3 0 9 5 1 0 8 0
+8 0 0 0 2 0 0 0 3 0
+9 6 1 0 0 4 0 7 0 5;
+display puzzle;
+solve;
+display puzzle_id, x;
+
+reset data;
+printf ("MEDIUM");
+data;
+
+# Medium Puzzle (Puzzle ID = 4700145906)
+param puzzle_id := 4700145906;
+param n := 3;  # Subgrid size (3x3 subgrid for 9x9 grid)
+param puzzle:
+  1 2 3 4 5 6 7 8 9 :=
+1 5 0 7 9 0 0 0 0 0
+2 0 4 6 0 2 0 0 0 0
+3 3 0 0 0 4 7 5 0 0
+4 8 0 0 2 0 0 9 0 0
+5 0 7 0 3 0 6 0 4 0
+6 0 0 4 0 0 5 0 0 6
+7 0 0 3 6 1 0 0 0 7
+8 0 0 0 0 3 0 4 1 0
+9 0 0 0 0 0 8 6 0 2;
+display puzzle;
+solve;
+display puzzle_id, x;
+
+reset data;
+printf ("HARD");
+data;
+
+# Hard Puzzle (Puzzle ID = 5762447530)
+param puzzle_id := 5762447530;
+param n := 3;  # Subgrid size (3x3 subgrid for 9x9 grid)
+param puzzle:
+  1 2 3 4 5 6 7 8 9 :=
+1 0 0 0 0 4 9 3 0 0
+2 0 0 5 0 0 0 0 0 2
+3 0 0 0 0 1 6 0 9 0
+4 0 0 0 0 0 2 0 4 1
+5 0 3 9 0 0 0 6 7 0
+6 1 4 0 8 0 0 0 0 0
+7 0 2 0 7 8 0 0 0 0
+8 8 0 0 0 0 0 4 0 0
+9 0 0 4 9 6 0 0 0 0;
+display puzzle;
+solve;
+display puzzle_id, x;
+
+reset data;
+printf ("EVIL");
+data;
+
+# Evil Puzzle (Puzzle ID = 4923641750)
+param puzzle_id := 4923641750;
+param n := 3;  # Subgrid size (3x3 subgrid for 9x9 grid)
+param puzzle:
+  1 2 3 4 5 6 7 8 9 :=
+1 4 0 9 0 0 0 0 0 0
+2 0 2 3 0 0 4 0 0 0
+3 0 0 0 2 7 0 0 0 0
+4 0 6 0 0 0 0 3 0 7
+5 7 4 0 6 0 3 0 2 5
+6 3 0 2 0 0 0 0 6 0
+7 0 0 0 0 6 1 0 0 0
+8 0 0 0 4 0 0 1 5 0
+9 0 0 0 0 0 0 8 0 2;
+display puzzle;
+solve;
+display puzzle_id, x;

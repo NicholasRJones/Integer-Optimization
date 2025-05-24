@@ -1,0 +1,28 @@
+# Define variables for each letter (digits between 0 and 9) # WDOTGLECM
+var x {i in 1..9} integer, >= 0, <= 9;
+
+# Define binary variables for uniqueness constraints (for all pairs of letters i and j)
+var y {i in 1..9, j in 1..9: i != j} binary;
+
+# Equation constraint for the subtraction
+subject to eq_constraint:
+    100000 * x[1] + 10000 * x[1] + 1000 * x[1] + 100 * x[2] + 10 * x[3] + 1 * x[4]
+    - (100000 * x[5] + 10000 * x[3] + 1000 * x[3] + 100 * x[5] + 10 * x[6] + 1 * x[7])
+    - (100000 * x[2] + 10000 * x[3] + 1000 * x[4] + 100 * x[8] + 10 * x[3] + 1 * x[9]) = 0;
+
+# Uniqueness constraints for the differences between digits (for all pairs i, j)
+subject to uniqueness_lower {i in 1..9, j in 1..9: i != j}:
+    1 <= x[i] - x[j] + 10 * y[i,j];
+
+subject to uniqueness_upper {i in 1..9, j in 1..9: i != j}:
+    x[i] - x[j] - 10 * (1 - y[i,j]) <= -1;
+
+
+# Specify the solver
+option solver gurobi;
+
+# Solve the model
+solve;
+
+# Output the results
+display x;
